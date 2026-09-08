@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "UNLICENSED" }
 authors = [{ name = "Dominik Scherrer" }]
-dependencies = []
+dependencies = ["python-docx>=1.1"]
 
 [project.optional-dependencies]
 dev = [
@@ -37,3 +37,7 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.10"
 strict = true
 files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["docx.*"]
+ignore_missing_imports = true

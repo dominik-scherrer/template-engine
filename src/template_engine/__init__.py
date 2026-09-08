@@ -6,7 +6,10 @@ that guards every future block type (see docs/adr/ADR-0002).
 """
 
 from template_engine.baum import Absatz, Block, Dokument, Ueberschrift
+from template_engine.fehler import FehlenderStil, RenderFehler, UnbekannteRolle
 from template_engine.markdown_surface import from_markdown, to_markdown
+from template_engine.render import render, rolle_fuer_block
+from template_engine.stilprofil import StyleProfile
 
 __all__ = [
     "Dokument",
@@ -15,4 +18,10 @@ __all__ = [
     "Absatz",
     "from_markdown",
     "to_markdown",
+    "StyleProfile",
+    "render",
+    "rolle_fuer_block",
+    "RenderFehler",
+    "UnbekannteRolle",
+    "FehlenderStil",
 ]
