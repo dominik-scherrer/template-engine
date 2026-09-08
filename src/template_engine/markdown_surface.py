@@ -13,7 +13,15 @@ content. For this first catalogue, metadata values are ``str``, ``int`` or
 from __future__ import annotations
 
 from template_engine._pandoc import blocks_to_markdown, markdown_to_blocks
-from template_engine.baum import Absatz, Block, Dokument, Ueberschrift, normtext
+from template_engine.baum import (
+    Absatz,
+    Aufzaehlung,
+    Block,
+    Dokument,
+    NummerierteListe,
+    Ueberschrift,
+    normtext,
+)
 from template_engine.pandoc_ast import baum_zu_pandoc, pandoc_zu_baum
 
 __all__ = ["to_markdown", "from_markdown"]
@@ -89,4 +97,8 @@ def _kanonisch(b: Block) -> Block:
         return Ueberschrift(ebene=b.ebene, text=normtext(b.text))
     if isinstance(b, Absatz):
         return Absatz(text=normtext(b.text))
+    if isinstance(b, Aufzaehlung):
+        return Aufzaehlung(punkte=[normtext(x) for x in b.punkte])
+    if isinstance(b, NummerierteListe):
+        return NummerierteListe(punkte=[normtext(x) for x in b.punkte])
     return b

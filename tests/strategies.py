@@ -12,7 +12,14 @@ from __future__ import annotations
 
 from hypothesis import strategies as st
 
-from template_engine.baum import Absatz, Block, Dokument, Ueberschrift
+from template_engine.baum import (
+    Absatz,
+    Aufzaehlung,
+    Block,
+    Dokument,
+    NummerierteListe,
+    Ueberschrift,
+)
 
 # A deliberately hostile alphabet: letters and digits, but also the Markdown
 # metacharacters most likely to expose an escaping bug, plus the non-ASCII
@@ -42,7 +49,14 @@ _ueberschrift = st.builds(
 
 _absatz = st.builds(Absatz, text=_kanonischer_text())
 
-_block: st.SearchStrategy[Block] = st.one_of(_ueberschrift, _absatz)
+# Lists: one to four canonical items. Drawing blocks i.i.d. means two adjacent
+# same-type lists occur naturally, which is exactly the merge hazard the mapping
+# has to absorb (pandoc's HTML-comment separator).
+_punkte = st.lists(_kanonischer_text(), min_size=1, max_size=4)
+_aufzaehlung = st.builds(Aufzaehlung, punkte=_punkte)
+_nummerierte = st.builds(NummerierteListe, punkte=_punkte)
+
+_block: st.SearchStrategy[Block] = st.one_of(_ueberschrift, _absatz, _aufzaehlung, _nummerierte)
 
 
 def dokumente() -> st.SearchStrategy[Dokument]:

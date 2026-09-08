@@ -73,3 +73,31 @@ def test_unsupported_inline_fails_loudly() -> None:
     # drop it, which is the whole point of the loud-failure contract.
     with pytest.raises(ValueError):
         te.from_markdown("Ein *betonter* Absatz.")
+
+
+def test_benachbarte_gleichartige_listen() -> None:
+    # Two adjacent lists of the same kind must stay two blocks. Pandoc separates
+    # them with an HTML-comment RawBlock on write; the mapping drops it on read
+    # (see pandoc_ast). Anchored so a regression shows even without Hypothesis.
+    dok = te.Dokument(
+        bloecke=[
+            te.Aufzaehlung(["a", "b"]),
+            te.Aufzaehlung(["c"]),
+            te.NummerierteListe(["x"]),
+            te.NummerierteListe(["y", "z"]),
+        ]
+    )
+    assert te.from_markdown(te.to_markdown(dok)) == dok
+
+
+def test_gemischtes_dokument_mit_listen() -> None:
+    dok = te.Dokument(
+        bloecke=[
+            te.Ueberschrift(1, "Titel"),
+            te.Absatz("Einleitung."),
+            te.Aufzaehlung(["Punkt eins", "Punkt zwei"]),
+            te.Absatz("Zwischentext."),
+            te.NummerierteListe(["Schritt eins", "Schritt zwei", "Schritt drei"]),
+        ]
+    )
+    assert te.from_markdown(te.to_markdown(dok)) == dok

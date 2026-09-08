@@ -25,7 +25,14 @@ from docx import Document
 from docx.document import Document as DocxDocument
 from docx.oxml.ns import qn
 
-from template_engine.baum import Absatz, Block, Dokument, Ueberschrift
+from template_engine.baum import (
+    Absatz,
+    Aufzaehlung,
+    Block,
+    Dokument,
+    NummerierteListe,
+    Ueberschrift,
+)
 from template_engine.fehler import FehlenderStil
 from template_engine.stilprofil import StyleProfile
 
@@ -38,12 +45,20 @@ def rolle_fuer_block(b: Block) -> str:
         return f"ueberschrift_{b.ebene}"
     if isinstance(b, Absatz):
         return "fliesstext"
+    if isinstance(b, Aufzaehlung):
+        return "aufzaehlung"
+    if isinstance(b, NummerierteListe):
+        return "nummerierte_liste"
     raise ValueError(f"no role rule for block type {type(b).__name__}")
 
 
-def _text_von(b: Block) -> str:
+def _absatztexte(b: Block) -> list[str]:
+    """The paragraph texts a block contributes. A list yields one per item, all
+    sharing the block's single resolved style."""
     if isinstance(b, (Ueberschrift, Absatz)):
-        return b.text
+        return [b.text]
+    if isinstance(b, (Aufzaehlung, NummerierteListe)):
+        return list(b.punkte)
     raise ValueError(f"cannot render block type {type(b).__name__}")
 
 
@@ -68,7 +83,8 @@ def render(dokument: Dokument, profil: StyleProfile, basis_docx: bytes) -> bytes
             raise FehlenderStil(
                 f"role {rolle!r} maps to style {stil!r}, which the base document does not define"
             )
-        plan.append((stil, _text_von(b)))
+        for text in _absatztexte(b):
+            plan.append((stil, text))
 
     _leere_generierte_zone(doc)
 

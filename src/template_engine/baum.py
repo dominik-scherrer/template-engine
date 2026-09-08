@@ -25,6 +25,8 @@ __all__ = [
     "Dokument",
     "Ueberschrift",
     "Absatz",
+    "Aufzaehlung",
+    "NummerierteListe",
     "normtext",
     "block_from_dict",
     "BLOCK_REGISTRY",
@@ -106,6 +108,38 @@ class Absatz(Block):
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Absatz:
         return cls(text=str(d["text"]))
+
+
+@_register
+@dataclass(frozen=True)
+class Aufzaehlung(Block):
+    """A bullet list. Single level, each point plain canonical text."""
+
+    TYP = "aufzaehlung"
+    punkte: list[str]
+
+    def to_dict(self) -> dict[str, object]:
+        return {"typ": self.TYP, "punkte": list(self.punkte)}
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Aufzaehlung:
+        return cls(punkte=[str(x) for x in d["punkte"]])
+
+
+@_register
+@dataclass(frozen=True)
+class NummerierteListe(Block):
+    """An ordered list. Single level, decimal ``1.`` numbering, plain items."""
+
+    TYP = "nummerierte_liste"
+    punkte: list[str]
+
+    def to_dict(self) -> dict[str, object]:
+        return {"typ": self.TYP, "punkte": list(self.punkte)}
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> NummerierteListe:
+        return cls(punkte=[str(x) for x in d["punkte"]])
 
 
 def block_from_dict(d: dict[str, Any]) -> Block:

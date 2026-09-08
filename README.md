@@ -80,10 +80,10 @@ The first thing built is the **round-trip gate** from the addendum to ADR-0002, 
 
 Implemented so far:
 
-- the canonical block tree (`src/template_engine/baum.py`), with a minimal catalogue: document, heading, paragraph;
+- the canonical block tree (`src/template_engine/baum.py`), with a catalogue of document, heading, paragraph, and single-level bullet and numbered lists;
 - the Markdown surface (`markdown_surface.py`), a lossless projection of the tree, with pandoc used only as the Markdown parser and serialiser (ADR-0012);
 - the gate itself (`tests/`): a property-based round-trip test over a hostile alphabet, plus anchored examples and a loud-failure check;
-- a first renderer (`render.py`, `stilprofil.py`): a block tree rendered into a base document against that document's own named styles, clearing the generated region while preserving section properties and headers (ADR-0011). A minimal `StyleProfile` (role to style-name) drives it, and a structural conformance check refuses a mapping that points at a style the base document does not define (ADR-0006).
+- a first renderer (`render.py`, `stilprofil.py`): a block tree rendered into a base document against that document's own named styles, clearing the generated region while preserving section properties and headers (ADR-0011); list items render as one styled paragraph each. A minimal `StyleProfile` (role to style-name) drives it, and a structural conformance check refuses a mapping that points at a style the base document does not define (ADR-0006).
 
 Not yet built: ingest and the zone model beyond a single all-generated body (ADR-0008, ADR-0009), the full style profile (zones, capability, prepared base), and the `SEQ`/figure work (ADR-0003 addendum). See `docs/round-trip-gate.md` for the definition of done that governs every new block type.
 

@@ -1,9 +1,8 @@
 """Renderer tests: content rendered against a base document's named styles.
 
-The base document is synthesised here with python-docx, so these tests need no
-real client template. It carries a few custom paragraph styles, a header, and
-some pre-existing body content, which is exactly what the renderer must clear
-while keeping the styles and the header.
+The base documents come from tests/basis.py and vary their style vocabularies
+on purpose, so a passing renderer is demonstrably following the base document's
+own names rather than assuming a fixed scheme.
 """
 
 from __future__ import annotations
@@ -12,25 +11,10 @@ import io
 
 import pytest
 from docx import Document
-from docx.enum.style import WD_STYLE_TYPE
 
 import template_engine as te
 from template_engine import FehlenderStil, StyleProfile, UnbekannteRolle, render
-
-
-def _basis_docx(
-    stile: list[str],
-    header: str = "ACME LETTERHEAD",
-    altinhalt: str = "vorbestehender Rumpfinhalt",
-) -> bytes:
-    doc = Document()
-    for name in stile:
-        doc.styles.add_style(name, WD_STYLE_TYPE.PARAGRAPH)
-    doc.sections[0].header.paragraphs[0].text = header
-    doc.add_paragraph(altinhalt)
-    buf = io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
+from tests.basis import Basis, alle_basen
 
 
 def _paragraphen(docx: bytes) -> list[tuple[str, str]]:
@@ -38,72 +22,74 @@ def _paragraphen(docx: bytes) -> list[tuple[str, str]]:
     return [(p.text, p.style.name) for p in doc.paragraphs]
 
 
-def test_rendert_gegen_benannte_stile() -> None:
-    basis = _basis_docx(["Titel 1", "Titel 2", "Fliesstext"])
-    profil = StyleProfile(
-        {
-            "ueberschrift_1": "Titel 1",
-            "ueberschrift_2": "Titel 2",
-            "fliesstext": "Fliesstext",
-        }
-    )
+def _profil(basis: Basis) -> StyleProfile:
+    return StyleProfile(dict(basis.rollen))
+
+
+@pytest.mark.parametrize("basis", alle_basen(), ids=lambda b: b.name)
+def test_rendert_alle_bloecke_gegen_basis_stile(basis: Basis) -> None:
+    r = basis.rollen
     dok = te.Dokument(
         bloecke=[
             te.Ueberschrift(1, "Ausgangslage"),
-            te.Absatz("Ein erster Absatz."),
-            te.Ueberschrift(2, "Vorgehen"),
-            te.Absatz("Ein zweiter Absatz."),
+            te.Absatz("Ein Absatz."),
+            te.Ueberschrift(2, "Punkte"),
+            te.Aufzaehlung(["alpha", "beta", "gamma"]),
+            te.NummerierteListe(["erstens", "zweitens"]),
         ]
     )
-    out = render(dok, profil, basis)
+    out = render(dok, _profil(basis), basis.docx)
 
     assert _paragraphen(out) == [
-        ("Ausgangslage", "Titel 1"),
-        ("Ein erster Absatz.", "Fliesstext"),
-        ("Vorgehen", "Titel 2"),
-        ("Ein zweiter Absatz.", "Fliesstext"),
+        ("Ausgangslage", r["ueberschrift_1"]),
+        ("Ein Absatz.", r["fliesstext"]),
+        ("Punkte", r["ueberschrift_2"]),
+        ("alpha", r["aufzaehlung"]),
+        ("beta", r["aufzaehlung"]),
+        ("gamma", r["aufzaehlung"]),
+        ("erstens", r["nummerierte_liste"]),
+        ("zweitens", r["nummerierte_liste"]),
     ]
 
 
-def test_kopfzeile_ueberlebt_und_alter_inhalt_verschwindet() -> None:
-    basis = _basis_docx(["Titel 1", "Fliesstext"], header="ACME LETTERHEAD")
-    profil = StyleProfile({"ueberschrift_1": "Titel 1", "fliesstext": "Fliesstext"})
+@pytest.mark.parametrize("basis", alle_basen(), ids=lambda b: b.name)
+def test_kopfzeile_ueberlebt_und_alter_inhalt_verschwindet(basis: Basis) -> None:
     dok = te.Dokument(bloecke=[te.Ueberschrift(1, "Neu")])
-    out = render(dok, profil, basis)
-
+    out = render(dok, _profil(basis), basis.docx)
     doc = Document(io.BytesIO(out))
-    assert doc.sections[0].header.paragraphs[0].text == "ACME LETTERHEAD"
-    assert all(p.text != "vorbestehender Rumpfinhalt" for p in doc.paragraphs)
+    assert doc.paragraphs[0].text == "Neu"
+    assert all("alt" not in p.text and "prior" not in p.text for p in doc.paragraphs)
 
 
 def test_unbekannte_rolle_wird_laut() -> None:
-    basis = _basis_docx(["Titel 1", "Fliesstext"])
-    profil = StyleProfile({"ueberschrift_1": "Titel 1", "fliesstext": "Fliesstext"})
-    dok = te.Dokument(bloecke=[te.Ueberschrift(3, "Zu tief")])  # ueberschrift_3 unmapped
+    basis = alle_basen()[0]
+    # Drop the heading-3 role: nothing maps ueberschrift_3.
+    dok = te.Dokument(bloecke=[te.Ueberschrift(3, "Zu tief")])
     with pytest.raises(UnbekannteRolle):
-        render(dok, profil, basis)
+        render(dok, _profil(basis), basis.docx)
 
 
 def test_fehlender_stil_wird_laut() -> None:
-    basis = _basis_docx(["Fliesstext"])  # no "Titel 1" in the base document
-    profil = StyleProfile({"ueberschrift_1": "Titel 1", "fliesstext": "Fliesstext"})
-    dok = te.Dokument(bloecke=[te.Ueberschrift(1, "X"), te.Absatz("y")])
+    basis = alle_basen()[0]
+    profil = StyleProfile({**basis.rollen, "fliesstext": "GibtEsNicht"})
+    dok = te.Dokument(bloecke=[te.Absatz("y")])
     with pytest.raises(FehlenderStil):
-        render(dok, profil, basis)
+        render(dok, profil, basis.docx)
 
 
 def test_pruefung_vor_mutation() -> None:
-    # A render that fails conformance must raise rather than return a document.
-    basis = _basis_docx(["Fliesstext"])
-    profil = StyleProfile({"ueberschrift_1": "Fehlt", "fliesstext": "Fliesstext"})
+    basis = alle_basen()[0]
+    profil = StyleProfile({**basis.rollen, "ueberschrift_1": "Fehlt"})
     dok = te.Dokument(bloecke=[te.Absatz("ok"), te.Ueberschrift(1, "kaputt")])
     with pytest.raises(FehlenderStil):
-        render(dok, profil, basis)
+        render(dok, profil, basis.docx)
 
 
 def test_rolle_fuer_block() -> None:
     assert te.rolle_fuer_block(te.Ueberschrift(2, "x")) == "ueberschrift_2"
     assert te.rolle_fuer_block(te.Absatz("x")) == "fliesstext"
+    assert te.rolle_fuer_block(te.Aufzaehlung(["x"])) == "aufzaehlung"
+    assert te.rolle_fuer_block(te.NummerierteListe(["x"])) == "nummerierte_liste"
 
 
 def test_profil_json_rundreise() -> None:
