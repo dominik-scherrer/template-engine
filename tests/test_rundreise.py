@@ -101,3 +101,25 @@ def test_gemischtes_dokument_mit_listen() -> None:
         ]
     )
     assert te.from_markdown(te.to_markdown(dok)) == dok
+
+
+def test_zitat_artiger_text_bleibt_literal() -> None:
+    # "@name" / "[@ref]" must stay literal text, not become citations. Locks the
+    # extension hardening in _pandoc._FORMAT.
+    dok = te.Dokument(bloecke=[te.Absatz("Siehe [@ref] und @name, Betrag $5 * 3, x~2~ und y^2^.")])
+    assert te.from_markdown(te.to_markdown(dok)) == dok
+
+
+def test_ueberschrift_mit_abschliessender_raute_scheitert_laut() -> None:
+    # A heading ending in "#" cannot round-trip; it must raise, not lose the char.
+    dok = te.Dokument(bloecke=[te.Ueberschrift(1, "Titel#")])
+    with pytest.raises(ValueError):
+        te.to_markdown(dok)
+
+
+def test_thematischer_bruch_als_absatz_scheitert_laut() -> None:
+    # A paragraph of "---" serialises to a horizontal rule and reads back as one.
+    # The mapping refuses it loudly rather than returning a different document.
+    dok = te.Dokument(bloecke=[te.Absatz("---")])
+    with pytest.raises(ValueError):
+        te.from_markdown(te.to_markdown(dok))

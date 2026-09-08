@@ -26,7 +26,27 @@ import subprocess
 from typing import Any
 
 # Read and write with the same extension set so the round trip is symmetric.
-_FORMAT = "markdown-smart-auto_identifiers"
+# Beyond -smart and -auto_identifiers we disable the extensions that would turn
+# plain punctuation into non-text inlines: citations ("@x"), dollar/backslash
+# math, superscript/subscript ("^"/"~"), inline notes, and bracketed spans /
+# link attributes / raw attributes ("{...}"). This catalogue treats all of those
+# as literal text, and disabling them on *read* makes that independent of how a
+# given pandoc version happens to escape them on *write* (the failure that
+# surfaced on pandoc 3.x for "[@x]"). raw_html and raw_tex stay enabled on
+# purpose, so pandoc keeps writing its inter-list separator as an HTML comment,
+# which the mapping drops (see pandoc_ast).
+_OFF = (
+    "citations",
+    "tex_math_dollars",
+    "tex_math_single_backslash",
+    "superscript",
+    "subscript",
+    "inline_notes",
+    "bracketed_spans",
+    "link_attributes",
+    "raw_attribute",
+)
+_FORMAT = "markdown-smart-auto_identifiers" + "".join("-" + e for e in _OFF)
 
 
 def _run(args: list[str], stdin: str) -> str:

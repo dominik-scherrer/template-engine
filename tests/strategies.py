@@ -36,15 +36,35 @@ _ZEICHEN = (
 _wort = st.text(alphabet=_ZEICHEN, min_size=1, max_size=12)
 
 
+def _ist_thematischer_bruch(s: str) -> bool:
+    """True for a line pandoc may read as a thematic break: three or more of a
+    single marker character (-, _ or *), with any spacing.
+
+    Pandoc escapes some of these on write and, inconsistently, not others (a bare
+    hyphen run like "---" or "-- -" survives unescaped and re-reads as a
+    horizontal rule). Rather than track its exact gaps, the generator keeps every
+    thematic-break shape out of the profile. The mapping still refuses a real
+    horizontal rule loudly, so genuine input is never lost silently.
+    """
+    kern = s.replace(" ", "")
+    return len(kern) >= 3 and len(set(kern)) == 1 and kern[0] in "-_*"
+
+
 def _kanonischer_text() -> st.SearchStrategy[str]:
     # Words joined by single spaces: canonical by construction.
-    return st.lists(_wort, min_size=1, max_size=6).map(" ".join)
+    return (
+        st.lists(_wort, min_size=1, max_size=6)
+        .map(" ".join)
+        .filter(lambda s: not _ist_thematischer_bruch(s))
+    )
 
 
+# Heading text must not end with "#": see the loud guard in pandoc_ast for why
+# that one construct is kept out of the profile.
 _ueberschrift = st.builds(
     Ueberschrift,
     ebene=st.integers(min_value=1, max_value=6),
-    text=_kanonischer_text(),
+    text=_kanonischer_text().filter(lambda s: not s.endswith("#")),
 )
 
 _absatz = st.builds(Absatz, text=_kanonischer_text())

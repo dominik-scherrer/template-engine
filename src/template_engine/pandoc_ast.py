@@ -88,6 +88,14 @@ def _plain_item(text: str) -> list[dict[str, Any]]:
 
 def block_to_pandoc(b: Block) -> dict[str, Any]:
     if isinstance(b, Ueberschrift):
+        # A heading whose text ends in "#" cannot round-trip: pandoc writes ATX
+        # headings and its reader strips a trailing run of "#" as a closing
+        # sequence. Refuse it loudly rather than lose the character silently.
+        if b.text.endswith("#"):
+            raise ValueError(
+                "heading text ending in '#' cannot be represented in Markdown "
+                "(pandoc ATX closing sequence)"
+            )
         return {"t": "Header", "c": [b.ebene, _EMPTY_ATTR, text_to_inlines(b.text)]}
     if isinstance(b, Absatz):
         return {"t": "Para", "c": text_to_inlines(b.text)}

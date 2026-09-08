@@ -52,13 +52,30 @@ python -m pip install -e ".[dev]"
 pytest -q --hypothesis-show-statistics
 ```
 
-Pandoc must be on the PATH. The mapping detects its API version at runtime, so
-any reasonably recent pandoc works. The gate has been run green on **pandoc
-2.9.2** (development) and **pandoc 3.1.3** (matching the design research); CI
-runs it again on whatever pandoc the runner ships. This is what backs the
-version-agnostic claim in ADR-0012: the same source, unchanged, passes on both.
+Pandoc must be on the PATH. The mapping detects its API version at runtime and
+echoes it back, so the code is not tied to a single pandoc release. Development
+and the gate run on **pandoc 3.9**; CI runs the runner's 3.x.
 
-One caveat for later: the current catalogue (headings, paragraphs, plain text)
-behaves identically across those versions only because it uses no construct that
-changed. `Figure` is a pandoc-types 1.23 node absent from 2.9, so the increment
-that adds figures and captions must be developed against a 3.x pandoc.
+An earlier iteration also ran on pandoc 2.9, and that taught a lesson worth
+recording: a property test passing once is not proof. Moving development to 3.x
+made the gate find two round-trip failures that 2.9 had masked, both now handled
+here rather than left for a client document to find:
+
+- **Headings ending in "#".** Pandoc writes ATX headings (its default since
+  2.11) and its reader strips a trailing run of "#" as a closing sequence, so
+  such a heading would lose the character. It is kept out of the profile: the
+  generator never produces it, and `block_to_pandoc` raises on it rather than
+  losing it silently.
+- **Inline-synthesis extensions.** Characters such as "@", "$", "^" and "~"
+  could be reparsed into citations, math or super/subscript instead of literal
+  text, depending on how a given pandoc escapes them on write. The read/write
+  format disables those extensions (`_pandoc._FORMAT`), so plain text stays
+  plain regardless of pandoc version.
+
+Tolerated, by contrast, are differences that carry no information: pandoc's
+inter-list separator (an HTML comment, dropped on read) and, when tables arrive,
+re-measured column widths. The ban still holds where loss would be real: row and
+column spans stay out of the profile (ADR-0002 addendum).
+
+Because the hardened format assumes a modern pandoc, the project targets pandoc
+3.x (roughly 2.11 and later).
