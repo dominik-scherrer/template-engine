@@ -74,9 +74,27 @@ The closest existing implementation is [docxbuilder](https://github.com/amedama4
 
 Pandoc's `--reference-doc` proves the underlying concept, resolving styles by name from a reference document, but it discards the reference document's body entirely, emits a single `sectPr`, hardcodes one table style name and generates no figure numbering. Those four limits are why it cannot serve as the renderer here.
 
-## Next step
+## Current state
 
-The round-trip test harness from the addendum to ADR-0002, before any renderer code. It turns the round-trip assumption into a constraint the block type catalogue must be designed against, rather than something checked afterwards.
+The first thing built is the **round-trip gate** from the addendum to ADR-0002, before any renderer code, so that the round-trip rule constrains the block type catalogue as it grows rather than being checked after the fact.
+
+Implemented so far:
+
+- the canonical block tree (`src/template_engine/baum.py`), with a minimal catalogue: document, heading, paragraph;
+- the Markdown surface (`markdown_surface.py`), a lossless projection of the tree, with pandoc used only as the Markdown parser and serialiser (ADR-0012);
+- the gate itself (`tests/`): a property-based round-trip test over a hostile alphabet, plus anchored examples and a loud-failure check.
+
+Not yet built: the renderer (ADR-0011), ingest and the zone model (ADR-0008, ADR-0009), style profiles (ADR-0004). See `docs/round-trip-gate.md` for the definition of done that governs every new block type.
+
+## Development
+
+```
+python -m pip install -e ".[dev]"
+pytest -q --hypothesis-show-statistics   # the gate
+ruff check src tests && mypy             # lint and types
+```
+
+Pandoc must be on the PATH; any reasonably recent version works (the mapping detects its API version at runtime).
 
 ## Licence
 
