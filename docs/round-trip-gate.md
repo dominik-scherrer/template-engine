@@ -53,5 +53,12 @@ pytest -q --hypothesis-show-statistics
 ```
 
 Pandoc must be on the PATH. The mapping detects its API version at runtime, so
-any reasonably recent pandoc works; development used 2.9, CI uses whatever the
-runner ships.
+any reasonably recent pandoc works. The gate has been run green on **pandoc
+2.9.2** (development) and **pandoc 3.1.3** (matching the design research); CI
+runs it again on whatever pandoc the runner ships. This is what backs the
+version-agnostic claim in ADR-0012: the same source, unchanged, passes on both.
+
+One caveat for later: the current catalogue (headings, paragraphs, plain text)
+behaves identically across those versions only because it uses no construct that
+changed. `Figure` is a pandoc-types 1.23 node absent from 2.9, so the increment
+that adds figures and captions must be developed against a 3.x pandoc.
