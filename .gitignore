@@ -25,3 +25,6 @@ build/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Demo outputs
+demo/out/
