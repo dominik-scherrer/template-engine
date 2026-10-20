@@ -37,6 +37,14 @@ single section with a different first-page header. So the zone boundary is a
 paragraph position within one section, and header/footer handling has to cope
 with first-page-different layouts rather than assuming one header per section.
 
+As built: the boundary is an index into the body's top-level *blocks*
+(paragraphs, tables and content controls), not paragraphs alone, because the
+cover page is typically a content control (`w:sdt` with a "Cover Pages" gallery)
+and the version table a table. In the real templates the body starts at the
+first top-level heading after a page break, a table of contents or a cover
+page; that is the heuristic's proposal, and it matched each template with front
+matter. A heading on the very first page is treated as part of the title page.
+
 ## Tables are ubiquitous
 
 Every template used several tables, each with a dedicated table style and its own

@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import functools
 import json
+import os
+import shutil
 import subprocess
 from typing import Any
 
@@ -49,9 +51,48 @@ _OFF = (
 _FORMAT = "markdown-smart-auto_identifiers" + "".join("-" + e for e in _OFF)
 
 
+class PandocNichtGefunden(RuntimeError):
+    """Raised when no pandoc binary can be located."""
+
+
+@functools.lru_cache(maxsize=1)
+def pandoc_pfad() -> str:
+    """Locate the pandoc binary, in order of preference.
+
+    1. ``TEMPLATE_ENGINE_PANDOC``, an explicit path, wins if it exists.
+    2. ``pandoc`` on the PATH, the normal case on a machine with pandoc installed.
+    3. a pandoc bundled by ``pypandoc`` (the ``pypandoc-binary`` package), so the
+       library works with no system install: ``pip install pypandoc-binary``.
+
+    Raises :class:`PandocNichtGefunden` with guidance if none is found, instead of
+    letting a raw "file not found" escape from deep inside a subprocess call.
+    """
+    override = os.environ.get("TEMPLATE_ENGINE_PANDOC")
+    if override and os.path.exists(override):
+        return override
+
+    found = shutil.which("pandoc")
+    if found:
+        return found
+
+    try:
+        import pypandoc
+
+        return str(pypandoc.get_pandoc_path())
+    except Exception:
+        pass
+
+    raise PandocNichtGefunden(
+        "pandoc was not found. Install it in one of these ways:\n"
+        "  - pip install pypandoc-binary   (bundles pandoc, no system install)\n"
+        "  - install pandoc from pandoc.org and put it on your PATH\n"
+        "  - set TEMPLATE_ENGINE_PANDOC to a pandoc executable"
+    )
+
+
 def _run(args: list[str], stdin: str) -> str:
     proc = subprocess.run(
-        ["pandoc", *args],
+        [pandoc_pfad(), *args],
         input=stdin.encode("utf-8"),
         capture_output=True,
     )

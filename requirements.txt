@@ -1,0 +1,16 @@
+# Convenience dependency list for running the demo and the library.
+# The canonical source of dependencies is pyproject.toml; this file just
+# lets you do:  pip install -r requirements.txt
+#
+# For development (tests, linting), prefer the extras instead:
+#   pip install -e ".[dev,pandoc]"
+#
+# For the MCP server and admin page:  pip install -e ".[server,pandoc]"
+
+# Runtime dependency of the library.
+python-docx>=1.1
+
+# Bundles a pandoc binary, so you do not need to install pandoc separately.
+# The library locates it automatically. If you already have pandoc on your
+# PATH, this line is optional.
+pypandoc-binary>=1.13

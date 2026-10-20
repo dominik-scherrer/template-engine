@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Template Engine Admin</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  --bg: #f4f5f3; --panel: #ffffff; --fg: #1d2321; --muted: #5d6763; --line: #d9ddd9;
+  --accent: #0c6670; --accent-fg: #ffffff; --soft: #e6f0f0;
+  --ok: #24724a; --ok-bg: #e3f2e9; --warn: #8a4b06; --warn-bg: #fbeedb;
+  --off: #6b6f6d; --off-bg: #e9eae9; --err: #a32626; --err-bg: #fbe5e5;
+  --stage: #e3e5e2;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141917; --panel: #1c2220; --fg: #e4e8e6; --muted: #9aa49f; --line: #303834;
+    --accent: #5ec0ca; --accent-fg: #0d1a1c; --soft: #1f3335;
+    --ok: #7fd3a2; --ok-bg: #1d3328; --warn: #f0b36a; --warn-bg: #3a2b18;
+    --off: #a4a8a6; --off-bg: #2a2f2d; --err: #f19a9a; --err-bg: #3c2020;
+    --stage: #0f1312;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 10px 20px;
+  border-bottom: 1px solid var(--line); background: var(--panel); }
+header h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .01em; }
+header h1 span { color: var(--muted); font-weight: 400; }
+#tokenbar { margin-left: auto; display: none; gap: 8px; align-items: center; }
+.layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: calc(100vh - 49px); }
+aside { border-right: 1px solid var(--line); padding: 16px; background: var(--panel); }
+main { padding: 20px 24px 60px; min-width: 0; }
+@media (max-width: 760px) { .layout { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid var(--line); } }
+h2 { font-size: 20px; margin: 0 0 4px; font-weight: 650; }
+h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; font-weight: 600; }
+.muted { color: var(--muted); }
+button, .btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text], input[type=password], select, textarea { font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+textarea { width: 100%; min-height: 220px; font-family: ui-monospace, "Cascadia Mono", Menlo, monospace; font-size: 13px; }
+.plist { list-style: none; margin: 12px 0 0; padding: 0; }
+.plist li { padding: 7px 8px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+.plist li:hover { background: var(--soft); }
+.plist li.on { background: var(--soft); font-weight: 600; }
+.plist .client { color: var(--muted); font-weight: 400; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; font-weight: 600; }
+.b-approved { color: var(--ok); background: var(--ok-bg); }
+.b-unapproved { color: var(--warn); background: var(--warn-bg); }
+.b-deactivated { color: var(--off); background: var(--off-bg); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.chips button { padding: 3px 10px; border-radius: 999px; font-size: 13px; }
+.chips button.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+table.map { border-collapse: collapse; width: 100%; max-width: 720px; }
+table.map td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.map td:first-child { width: 42%; }
+table.map code { font-size: 12px; }
+table.map select { width: 100%; }
+.hint { font-size: 12px; color: var(--muted); }
+.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 28px; text-align: center; color: var(--muted); cursor: pointer; }
+.drop.over { border-color: var(--accent); background: var(--soft); }
+.msg { padding: 8px 12px; border-radius: 6px; margin: 10px 0; }
+.msg.err { color: var(--err); background: var(--err-bg); }
+.msg.warn { color: var(--warn); background: var(--warn-bg); }
+.msg.ok { color: var(--ok); background: var(--ok-bg); }
+.preview-grid { display: grid; grid-template-columns: minmax(260px, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .preview-grid { grid-template-columns: 1fr; } }
+.stage { background: var(--stage); border-radius: 8px; min-height: 300px; max-height: 80vh; overflow: auto; padding: 0; }
+.stage .placeholder { padding: 40px; text-align: center; color: var(--muted); }
+.stage .docx-wrapper { background: transparent !important; padding: 20px !important; }
+.stage .docx-wrapper > section.docx { box-shadow: 0 1px 6px rgba(0,0,0,.25) !important; margin-bottom: 20px !important; }
+.zoomable { transform-origin: top left; }
+pre.guide { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px; font-size: 12px; max-height: 260px; overflow: auto; }
+details summary { cursor: pointer; color: var(--muted); }
+.struct { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; max-width: 980px; }
+.struct table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.struct td { padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.struct td.t { white-space: normal; width: 100%; color: var(--fg); }
+.struct tr.kept td { background: var(--soft); }
+.struct tr.kept td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.struct tr.gen td { color: var(--muted); }
+.struct tr.gen td.t { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); color: var(--muted); }
+.struct tr.start td { border-top: 2px solid var(--accent); }
+.struct.pick tr { cursor: pointer; }
+.struct.pick tr:hover td { outline: 1px solid var(--accent); outline-offset: -1px; }
+.flag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--off-bg); color: var(--off); margin-right: 3px; text-transform: uppercase; letter-spacing: .04em; }
+.zone { font-size: 11px; font-weight: 600; }
+.zone.k { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Template Engine <span>· Admin</span></h1>
+  <div id="tokenbar"><span class="muted">Admin token</span><input id="token" type="password" size="22"><button id="tokenset">Use</button></div>
+</header>
+<div class="layout">
+  <aside>
+    <button class="primary" id="newbtn" style="width:100%">+ New profile</button>
+    <ul class="plist" id="plist"></ul>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script src="/admin/vendor/jszip.min.js"></script>
+<script src="/admin/vendor/docx-preview.min.js"></script>
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let INFO = null, PROFILES = [], CURRENT = null;
+
+function token() { try { return sessionStorage.getItem("te_admin_token") || ""; } catch { return ""; } }
+$("#tokenset").onclick = () => { try { sessionStorage.setItem("te_admin_token", $("#token").value); } catch {} boot(); };
+
+async function api(path, { method = "GET", json, body, headers = {}, blob = false } = {}) {
+  const h = { ...headers };
+  if (token()) h["X-Admin-Token"] = token();
+  if (json !== undefined) { h["Content-Type"] = "application/json"; body = JSON.stringify(json); }
+  const r = await fetch(path, { method, headers: h, body });
+  if (r.status === 401) { $("#tokenbar").style.display = "flex"; throw new Error("Admin token required."); }
+  if (!r.ok) {
+    let m = r.statusText; try { m = (await r.json()).error || m; } catch {}
+    throw new Error(m);
+  }
+  return blob ? r.blob() : r.json();
+}
+
+function msg(el, kind, text) { el.innerHTML = text ? `<div class="msg ${kind}">${esc(text)}</div>` : ""; }
+const badge = s => `<span class="badge b-${esc(s)}">${esc(s)}</span>`;
+
+// -- sidebar -----------------------------------------------------------------
+
+async function loadProfiles() {
+  PROFILES = (await api("/admin/api/profiles")).profiles;
+  const ul = $("#plist");
+  if (!PROFILES.length) { ul.innerHTML = '<li class="muted" style="cursor:default">No profiles yet.</li>'; return; }
+  ul.innerHTML = PROFILES.map(p => {
+    const v = p.versions.find(x => x.version === p.latest) || p.versions[p.versions.length - 1];
+    const [c, t] = p.name.split("/");
+    return `<li data-name="${esc(p.name)}" class="${CURRENT === p.name ? "on" : ""}">
+      <span><span class="client">${esc(c)}/</span>${esc(t)}</span>${badge(v.status)}</li>`;
+  }).join("");
+  ul.querySelectorAll("li[data-name]").forEach(li => li.onclick = () => showProfile(li.dataset.name));
+}
+
+// -- preview panel (shared) ----------------------------------------------------
+
+// Browsers cannot display EMF/WMF, the format most Word logos come in. For the
+// preview only, each such image is swapped for a placeholder of the same aspect
+// ratio, so its place on the page stays visible. The downloadable file is untouched.
+function metafileAspect(buf) {
+  const dv = new DataView(buf);
+  try {
+    if (dv.getUint32(0, true) === 1 && dv.getUint32(40, true) === 0x464D4520) {  // EMF: rclFrame
+      const w = dv.getInt32(32, true) - dv.getInt32(24, true), h = dv.getInt32(36, true) - dv.getInt32(28, true);
+      if (w > 0 && h > 0) return h / w;
+    }
+    if (dv.getUint32(0, true) === 0x9AC6CDD7) {  // placeable WMF: bounding box
+      const w = dv.getInt16(10, true) - dv.getInt16(6, true), h = dv.getInt16(12, true) - dv.getInt16(8, true);
+      if (w > 0 && h > 0) return h / w;
+    }
+  } catch {}
+  return 0.3;
+}
+function placeholderPng(buf, label) {
+  const w = 600, h = Math.max(24, Math.min(1800, Math.round(w * metafileAspect(buf))));
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  g.fillStyle = "#eef1f0"; g.fillRect(0, 0, w, h);
+  g.strokeStyle = "#9aa6a2"; g.lineWidth = 4; g.setLineDash([14, 10]); g.strokeRect(2, 2, w - 4, h - 4);
+  g.fillStyle = "#5d6763"; g.textAlign = "center"; g.textBaseline = "middle";
+  const size = Math.max(14, Math.min(40, h / 4)); g.font = `${size}px system-ui, sans-serif`;
+  g.fillText(h > 60 ? `${label} image (not shown in preview)` : label, w / 2, h / 2, w - 20);
+  return new Promise(ok => c.toBlob(ok, "image/png"));
+}
+async function forPreview(blob) {
+  const zip = await JSZip.loadAsync(blob);
+  const names = Object.keys(zip.files).filter(n => /^word\/media\/[^/]+\.(emf|wmf)$/i.test(n));
+  for (const n of names) {
+    const buf = await zip.file(n).async("arraybuffer");
+    zip.file(n, await placeholderPng(buf, n.split(".").pop().toUpperCase()));
+  }
+  return names.length ? zip.generateAsync({ type: "blob" }) : blob;
+}
+
+function previewPanel(host, { markdown, render, filename }) {
+  host.innerHTML = `
+    <div class="preview-grid">
+      <div>
+        <textarea class="md" spellcheck="false"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="primary go">Render preview</button>
+          <button class="dl" disabled>Download .docx</button>
+          <label class="hint">Zoom <select class="zoom"><option>50</option><option>75</option><option selected>90</option><option>100</option></select>%</label>
+        </div>
+        <div class="pmsg"></div>
+        <div class="hint">The preview is drawn in the browser and gives a rough idea only. Word lays out pages, fonts and fields (contents, page numbers) on its own, and EMF/WMF images such as most logos appear as placeholders.</div>
+      </div>
+      <div class="stage"><div class="placeholder">Render to see a preview.</div></div>
+    </div>`;
+  const ta = $(".md", host), stage = $(".stage", host), pmsg = $(".pmsg", host), dl = $(".dl", host);
+  ta.value = markdown || "";
+  let lastBlob = null;
+  const applyZoom = () => { const z = $(".zoom", host).value / 100; const w = $(".zoomable", stage); if (w) { w.style.transform = `scale(${z})`; w.style.width = `${100 / z}%`; } };
+  $(".zoom", host).onchange = applyZoom;
+  $(".go", host).onclick = async () => {
+    msg(pmsg, "", ""); $(".go", host).disabled = true;
+    try {
+      lastBlob = await render(ta.value);
+      stage.innerHTML = '<div class="zoomable"></div>';
+      await docx.renderAsync(await forPreview(lastBlob), $(".zoomable", stage), null, {
+        inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true,
+        renderHeaders: true, renderFooters: true, experimental: true,
+      });
+      applyZoom(); dl.disabled = false;
+    } catch (e) { msg(pmsg, "err", e.message); }
+    finally { $(".go", host).disabled = false; }
+  };
+  dl.onclick = () => {
+    if (!lastBlob) return;
+    const a = document.createElement("a"); a.href = URL.createObjectURL(lastBlob);
+    a.download = (filename ? filename() : "preview") + ".docx"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  return { setMarkdown: v => { ta.value = v; } };
+}
+
+// -- template structure: kept front and generated body --------------------------
+
+function structureTable(host, blocks, boundary, onPick) {
+  const b = boundary == null ? 0 : boundary;
+  const flags = x => [x.cover && "cover", x.toc && "contents", x.page_break && "page break",
+    x.section_break && "section break", x.image && "image"].filter(Boolean).map(f => `<span class="flag">${f}</span>`).join("");
+  const kind = { paragraph: "¶", table: "table", control: "control" };
+  const rows = blocks.map(x => `
+    <tr data-i="${x.index}" class="${x.index < b ? "kept" : "gen"}${x.index === b ? " start" : ""}">
+      <td class="muted">${x.index}</td>
+      <td>${x.index < b ? '<span class="zone k">kept</span>' : '<span class="zone">replaced</span>'}</td>
+      <td class="muted">${esc(kind[x.kind] || x.kind)}</td>
+      <td class="muted">${esc(x.styleId)}</td>
+      <td class="t">${flags(x)}${esc(x.text) || '<span class="muted">(empty)</span>'}</td></tr>`).join("");
+  const end = `<tr data-i="${blocks.length}" class="${blocks.length === b ? "start" : ""}"><td class="muted">${blocks.length}</td><td></td><td></td><td></td><td class="t muted">end of template — generated body is appended here</td></tr>`;
+  host.innerHTML = `
+    <p class="hint" style="margin:0 0 6px">${onPick
+      ? "Click the block where the generated body begins. Everything above it stays exactly as in the template: cover, imprint, version table, contents, with their images."
+      : "Blocks above the line are kept from the template; the rest is replaced by the agent's content."}
+      ${b === 0 ? "<strong>Currently the whole body is generated.</strong>" : ""}</p>
+    <div class="struct${onPick ? " pick" : ""}"><table>${rows}${end}</table></div>`;
+  if (onPick) host.querySelectorAll("tr[data-i]").forEach(tr => tr.onclick = () => onPick(+tr.dataset.i));
+}
+
+// -- profile detail ------------------------------------------------------------
+
+async function showProfile(name, version) {
+  CURRENT = name; loadProfiles();
+  const p = PROFILES.find(x => x.name === name) || (await api("/admin/api/profiles")).profiles.find(x => x.name === name);
+  const v = version || p.latest || p.versions[p.versions.length - 1].version;
+  const d = await api(`/admin/api/profiles/${name}/${v}`);
+  const info = d.info, main = $("#main");
+  const styleName = id => { const s = (d.styles || []).find(x => x.styleId === id || x.name === id); return s ? s.name : id; };
+  main.innerHTML = `
+    <h2>${esc(name)}</h2>
+    <div class="row chips" style="margin:10px 0">${p.versions.map(x =>
+      `<button data-v="${x.version}" class="${x.version === v ? "on" : ""}">v${x.version}</button>`).join("")}
+      <button id="newver" style="margin-left:8px">Upload new version</button></div>
+    <div class="row">${badge(info.status)}
+      <span class="muted">created ${esc(info.created_at.replace("T", " ").replace("+00:00", " UTC"))} · ${esc(info.source)}${info.original_filename ? " · " + esc(info.original_filename) : ""}${info.approved_at ? " · approved " + esc(info.approved_at.slice(0, 10)) : ""}</span></div>
+    <div class="row" style="margin-top:12px">
+      ${info.status !== "approved" ? '<button class="primary" data-s="approved">Approve</button>' : ""}
+      ${info.status === "approved" ? '<button data-s="unapproved">Revoke approval</button>' : ""}
+      ${info.status !== "deactivated" ? '<button data-s="deactivated">Deactivate</button>' : '<button data-s="unapproved">Reactivate (unapproved)</button>'}
+    </div>
+    <div id="smsg"></div>
+    ${d.deactivated ? '<div class="msg warn">This version is deactivated and cannot be rendered. Reactivate it to inspect or use it again.</div>' : `
+    <h3>Mapping</h3>
+    <table class="map">${Object.entries(INFO.roles).map(([role, hint]) => `
+      <tr><td><code>${esc(role)}</code><div class="hint">${esc(hint)}</div></td>
+      <td>${d.mapping[role] ? esc(styleName(d.mapping[role])) + (styleName(d.mapping[role]) !== d.mapping[role] ? ` <span class="hint">(${esc(d.mapping[role])})</span>` : "") : '<span class="muted">not mapped</span>'}</td></tr>`).join("")}
+    </table>
+    <h3>Kept front pages and generated body</h3><div id="struct"></div>
+    <details style="margin-top:12px"><summary>Format guide agents receive</summary><pre class="guide">${esc(d.guide)}</pre></details>
+    <h3>Test render</h3><div id="pv"></div>`}`;
+  main.querySelectorAll(".chips button[data-v]").forEach(b => b.onclick = () => showProfile(name, +b.dataset.v));
+  $("#newver").onclick = () => showNew(name);
+  main.querySelectorAll("button[data-s]").forEach(b => b.onclick = async () => {
+    try { await api(`/admin/api/profiles/${name}/${v}/status`, { method: "POST", json: { status: b.dataset.s } }); showProfile(name, v); }
+    catch (e) { msg($("#smsg"), "err", e.message); }
+  });
+  if (!d.deactivated) structureTable($("#struct"), d.blocks, d.boundary, null);
+  if (!d.deactivated) previewPanel($("#pv"), {
+    markdown: d.sample,
+    filename: () => name.replace("/", "-") + `-v${v}`,
+    render: md => api(`/admin/api/profiles/${name}/${v}/preview`, { method: "POST", json: { markdown: md }, blob: true }),
+  });
+}
+
+// -- new profile / new version ---------------------------------------------------
+
+function showNew(prefill) {
+  CURRENT = null; loadProfiles();
+  const main = $("#main");
+  main.innerHTML = `
+    <h2>${prefill ? "New version of " + esc(prefill) : "New profile"}</h2>
+    <p class="muted">Upload the client's Word template, check the proposed mapping, test-render, then publish.</p>
+    <div class="row" style="margin:12px 0">
+      <label>Profile name <input type="text" id="pname" placeholder="client/template" value="${esc(prefill || "")}" size="30" list="names"></label>
+      <datalist id="names">${PROFILES.map(p => `<option value="${esc(p.name)}">`).join("")}</datalist>
+      <span class="hint">lowercase, e.g. <code>acme/report</code></span>
+    </div>
+    <div class="drop" id="drop">Drop a .dotx or .docx here, or click to choose<input type="file" id="file" accept=".dotx,.docx" hidden></div>
+    <div id="umsg"></div><div id="draft"></div>`;
+  const drop = $("#drop"), file = $("#file");
+  drop.onclick = () => file.click();
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); };
+  file.onchange = () => file.files[0] && upload(file.files[0]);
+}
+
+async function upload(f) {
+  msg($("#umsg"), "", ""); $("#drop").textContent = "Reading " + f.name + " …";
+  let d;
+  try { d = await api("/admin/api/drafts", { method: "POST", body: f, headers: { "X-Filename": f.name, "Content-Type": "application/octet-stream" } }); }
+  catch (e) { $("#drop").textContent = "Drop a .dotx or .docx here"; msg($("#umsg"), "err", e.message); return; }
+  $("#drop").textContent = f.name + " · " + d.styles.length + " paragraph styles";
+  const host = $("#draft");
+  const opts = sel => '<option value="">— not mapped —</option>' + d.styles.map(s =>
+    `<option value="${esc(s.styleId)}"${s.styleId === sel || s.name === sel ? " selected" : ""}>${esc(s.name)}${s.name !== s.styleId ? " (" + esc(s.styleId) + ")" : ""}</option>`).join("");
+  host.innerHTML = `
+    <h3>Mapping</h3>
+    <div class="row" style="margin-bottom:8px">
+      <button id="ph">Propose (heuristic)</button>
+      <button id="pl" ${INFO.llm ? "" : "disabled title='Set TEMPLATE_ENGINE_LLM_* on the server'"}>Propose (model)</button>
+      <span class="hint" id="psrc">proposed by: heuristic</span>
+    </div>
+    <table class="map">${Object.entries(INFO.roles).map(([role, hint]) => `
+      <tr><td><code>${esc(role)}</code><div class="hint">${esc(hint)}</div></td>
+      <td><select data-role="${esc(role)}">${opts(d.mapping[role])}</select></td></tr>`).join("")}
+    </table>
+    <div id="pextra"></div>
+    <h3>Kept front pages and generated body</h3><div id="struct"></div>
+    <h3>Test render</h3><div id="pv"></div>
+    <h3>Publish</h3>
+    <div class="row">
+      <label><input type="checkbox" id="approve"> Approve now</label>
+      <button class="primary" id="pub">Publish</button>
+    </div>
+    <div id="pubmsg"></div>`;
+  const mapping = () => { const m = {}; host.querySelectorAll("select[data-role]").forEach(s => { if (s.value) m[s.dataset.role] = s.value; }); return m; };
+  let boundary = d.boundary ?? 0;
+  const pickBoundary = i => { boundary = i; structureTable($("#struct"), d.blocks, boundary, pickBoundary); };
+  pickBoundary(boundary);
+  const setMapping = m => host.querySelectorAll("select[data-role]").forEach(s => { s.innerHTML = opts(m[s.dataset.role]); });
+  const pv = previewPanel($("#pv"), {
+    markdown: (await api(`/admin/api/drafts/${d.draft_id}/sample`, { method: "POST", json: { mapping: mapping() } })).markdown,
+    filename: () => ($("#pname").value || "draft").replace("/", "-"),
+    render: md => api(`/admin/api/drafts/${d.draft_id}/preview`, { method: "POST", json: { mapping: mapping(), boundary, markdown: md }, blob: true }),
+  });
+  const refreshSample = async () => pv.setMarkdown((await api(`/admin/api/drafts/${d.draft_id}/sample`, { method: "POST", json: { mapping: mapping() } })).markdown);
+  host.querySelectorAll("select[data-role]").forEach(s => s.onchange = refreshSample);
+  const propose = async kind => {
+    msg($("#pextra"), "", ""); $("#psrc").textContent = "proposing …";
+    try {
+      const r = await api(`/admin/api/drafts/${d.draft_id}/propose`, { method: "POST", json: { proposer: kind } });
+      setMapping(r.mapping); $("#psrc").textContent = "proposed by: " + r.source; refreshSample();
+      if (r.boundary != null) pickBoundary(r.boundary);
+      if ((r.binding_sites || []).length)
+        msg($("#pextra"), "warn", `The model also proposed ${r.binding_sites.length} title-page field(s). Filling title-page fields is not built yet.`);
+    } catch (e) { $("#psrc").textContent = ""; msg($("#pextra"), "err", e.message); }
+  };
+  $("#ph").onclick = () => propose("heuristic");
+  $("#pl").onclick = () => propose("llm");
+  $("#pub").onclick = async () => {
+    msg($("#pubmsg"), "", "");
+    try {
+      const r = await api(`/admin/api/drafts/${d.draft_id}/publish`, { method: "POST",
+        json: { name: $("#pname").value.trim(), mapping: mapping(), boundary, approve: $("#approve").checked } });
+      await loadProfiles(); showProfile(r.info.name, r.info.version);
+    } catch (e) { msg($("#pubmsg"), "err", e.message); }
+  };
+}
+
+// -- boot ------------------------------------------------------------------------
+
+async function boot() {
+  try {
+    INFO = await api("/admin/api/info");
+    $("#tokenbar").style.display = "none";
+    await loadProfiles();
+    if (!$("#main").innerHTML) $("#main").innerHTML = '<p class="muted">Select a profile, or upload a template with “New profile”.</p>';
+  } catch (e) { $("#main").innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+$("#newbtn").onclick = () => showNew();
+boot();
+</script>
+</body>
+</html>

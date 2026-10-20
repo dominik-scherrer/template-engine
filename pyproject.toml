@@ -17,9 +17,18 @@ dev = [
   "pytest>=8",
   "hypothesis>=6.100",
 ]
+pandoc = [
+  "pypandoc-binary>=1.13",
+]
+server = [
+  "mcp>=2.3,<3",
+]
+
+[project.scripts]
+template-engine-server = "template_engine_server.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/template_engine"]
+packages = ["src/template_engine", "src/template_engine_server"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -39,5 +48,5 @@ strict = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["docx.*"]
+module = ["docx.*", "pypandoc.*", "lxml.*"]
 ignore_missing_imports = true

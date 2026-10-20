@@ -2,7 +2,7 @@
 
 A library that ingests a client's Word template and renders freely structured content as `.docx` files that look as though they had been written in that template.
 
-**Status: design, no implementation yet.** This repository currently holds a specification, thirteen architecture decision records and a glossary, deliberately written before any code.
+**Status: early working prototype.** The library renders Markdown into a client template, keeping the template's front pages, and an MCP server with an admin page lets agents use stored templates by name. Interfaces will still change. The design (specification, ADRs, glossary) was written before the code and is kept in `SPEC.md` and `docs/`.
 
 ## The problem
 
@@ -18,7 +18,7 @@ A document is a sequence of **zones**:
 
 | Zone | Treatment | Content |
 |---|---|---|
-| Retained | copied through, Jinja tags substituted, Word fields left as fields | title page, version table, tables of contents and figures |
+| Retained | copied through, Word fields left as fields (Jinja tag substitution planned) | title page, version table, tables of contents and figures |
 | Generated | cleared and rebuilt from the block tree | the document body |
 
 Placeholders still exist, but only in the retained zone, where the structure genuinely is fixed.
@@ -33,12 +33,32 @@ Placeholders still exist, but only in the retained zone, where the structure gen
 
 This is a library, not a service or an application (ADR-0013). It owns no database, calls no model, renders no interface and keeps no state between calls. It returns serialisable values and proposals; the caller persists, versions, and collects human confirmation.
 
-```python
-proposals = ingest.analyse(template_bytes, proposer=my_proposer)
-profile   = ingest.apply(template_bytes, confirmed=reviewed_proposals)
+A separate package in this repository, `template_engine_server`, is such a caller: an MCP service with a profile store, so agents can render by profile name (ADR-0014, `docs/server.md`). The library never imports it.
 
-document = ContentDocument.from_markdown(md_text)
-docx     = render(document, profile)
+```python
+import template_engine as te
+from template_engine import ingest
+
+raw = open("template.dotx", "rb").read()
+
+# Ingest, once: propose a mapping and body boundary, have a person confirm them.
+proposal = ingest.heuristischer_vorschlag(ingest.kontext_aus_bytes(raw))
+profile = te.StyleProfile(
+    {role: style for role, style in proposal.rollen.items() if style},
+    koerpergrenze=proposal.koerpergrenze,
+)
+base = te.bereite_vor(ingest.als_dokument_bytes(raw), profile.koerpergrenze or 0)
+
+# Render, per document: deterministic.
+docx = te.render(te.from_markdown(open("content.md").read()), profile, base)
+```
+
+To run it as a service for agents instead, see `docs/server.md`:
+
+```
+uv sync --extra server --extra pandoc
+uv run template-engine-server import acme/report template.dotx
+uv run template-engine-server serve      # MCP at :8765/mcp, admin page at :8765/admin
 ```
 
 ## Layout
@@ -46,8 +66,9 @@ docx     = render(document, profile)
 ```
 SPEC.md                     specification: scope, architecture, data flow, open questions
 docs/
-  adr/ADR-0001 ... 0013     architecture decision records
+  adr/ADR-0001 ... 0014     architecture decision records
   GLOSSARY.md               terms
+  server.md                 running the MCP server
 ```
 
 ## The decisions in brief
@@ -67,6 +88,7 @@ docs/
 | 0011 | `python-docx` as the renderer, with a minimal field surface |
 | 0012 | Own block tree; Pandoc used only as a surface tool |
 | 0013 | A standalone library, not a component of a host |
+| 0014 | An MCP service with a server-side profile store; agents onboard, admins approve |
 
 ## Prior art
 
@@ -85,18 +107,26 @@ Implemented so far:
 - the gate itself (`tests/`): a property-based round-trip test over a hostile alphabet, plus anchored examples and a loud-failure check;
 - a first renderer (`render.py`, `stilprofil.py`): a block tree rendered into a base document against that document's own named styles, clearing the generated region while preserving section properties and headers (ADR-0011); list items render as one styled paragraph each. A minimal `StyleProfile` (role to style-name) drives it, and a structural conformance check refuses a mapping that points at a style the base document does not define (ADR-0006).
 
-Not yet built: ingest and the zone model beyond a single all-generated body (ADR-0008, ADR-0009), the full style profile (zones, capability, prepared base), and the `SEQ`/figure work (ADR-0003 addendum). See `docs/round-trip-gate.md` for the definition of done that governs every new block type.
+- the MCP server (`src/template_engine_server/`): a versioned profile store on disk with approval status, the tools `list_profiles`, `format_guide` and `render`, expiring download links, an admin page at `/admin` with mapping editor and browser preview, and a command line to import and approve templates (ADR-0014, `docs/server.md`).
+
+- the zone model (`zonen.py`, ADR-0008): a retained front (cover page, imprint, version table, table of contents, with their images) is kept verbatim and only the body after a boundary is regenerated. The boundary is a hidden bookmark written into the prepared base document (ADR-0009), with the block index in the profile as fallback; ingest proposes it, a person confirms it in the admin page. A kept table of contents makes Word update fields on opening.
+
+Not yet built: the agent onboarding tools and MCP authentication of the server, filling title-page fields (binding sites, ADR-0009/0010), tables in the generated body, the capability profile, and the `SEQ`/figure work (ADR-0003 addendum). See `docs/round-trip-gate.md` for the definition of done that governs every new block type.
 
 ## Development
 
 ```
-python -m pip install -e ".[dev]"
-pytest -q --hypothesis-show-statistics   # the gate
-ruff check src tests && mypy             # lint and types
+python -m pip install -e ".[dev,server,pandoc]"   # or: uv sync --all-extras
+pytest -q --hypothesis-show-statistics            # the gate and all other tests
+ruff check src tests && mypy                      # lint and types
 ```
 
-Pandoc must be on the PATH; any reasonably recent version works (the mapping detects its API version at runtime).
+The `pandoc` extra bundles a pandoc binary. A pandoc on the PATH works too (any reasonably recent version; the mapping detects its API version at runtime), and `TEMPLATE_ENGINE_PANDOC` points at a specific one.
+
+Real client templates are confidential and never part of this repository: `*.docx`/`*.dotx` outside `tests/fixtures` and the server's `data/` directory are gitignored. Tests use synthetic templates.
 
 ## Licence
 
 Not yet chosen. This repository is not licensed for reuse until one is added.
+
+The bundled preview libraries keep their own licences: docx-preview (Apache-2.0) and JSZip (MIT), see `src/template_engine_server/static/vendor/`.

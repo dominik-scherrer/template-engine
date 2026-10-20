@@ -6,11 +6,12 @@ base document, clears the region it is going to generate while leaving the
 document's styles, numbering, headers, footers and section properties untouched,
 and writes each block as a paragraph carrying the client's own named style.
 
-Scope of this increment: the base document is treated as a single generated
-zone (its whole body is regenerated). The zone model of ADR-0008, where a
-retained front such as a title page is kept and only a marked body region is
-regenerated, arrives with the ingest work; the sectPr-preserving clear built
-here is the mechanism that increment will reuse.
+Zones (ADR-0008): everything before the body boundary (a bookmark in the
+prepared base document, or the profile's ``koerpergrenze`` as fallback) is kept
+verbatim: cover page, imprint, version table, table of contents, with their
+images. Only the region after the boundary is cleared and regenerated. Without
+a boundary the whole body is generated. When a kept table of contents exists,
+the document asks Word to update its fields on opening (ADR-0003).
 
 python-docx is the substrate (ADR-0011). Rendering is deterministic and calls no
 model.
@@ -35,6 +36,7 @@ from template_engine.baum import (
 )
 from template_engine.fehler import FehlenderStil
 from template_engine.stilprofil import StyleProfile
+from template_engine.zonen import BLOCK_TAGS, finde_grenze
 
 __all__ = ["render", "rolle_fuer_block"]
 
@@ -72,39 +74,108 @@ def render(dokument: Dokument, profil: StyleProfile, basis_docx: bytes) -> bytes
     """
     doc = Document(io.BytesIO(basis_docx))
 
-    vorhandene_stile = {s.name for s in doc.styles}
+    # A style can be addressed by its display name or by its styleId. Real
+    # templates make the distinction matter: a built-in heading has the display
+    # name "Heading 1" but the styleId "Heading1", and its raw name in the file
+    # may differ again by locale. Accepting either key lets a profile map roles
+    # by the stable styleId (preferred, see docs/ingest-notes.md) or by name.
+    nach_schluessel: dict[str, Any] = {}
+    for style in doc.styles:
+        if style.name:
+            nach_schluessel[style.name] = style
+        if style.style_id:
+            nach_schluessel[style.style_id] = style
 
     # Resolve and check everything up front (ADR-0006): fail before mutating.
-    plan: list[tuple[str, str]] = []  # (style name, text)
+    plan: list[tuple[Any, str]] = []  # (style object, text)
     for b in dokument.bloecke:
         rolle = rolle_fuer_block(b)
         stil = profil.resolve(rolle)  # raises UnbekannteRolle
-        if stil not in vorhandene_stile:
+        stil_obj = nach_schluessel.get(stil)
+        if stil_obj is None:
             raise FehlenderStil(
                 f"role {rolle!r} maps to style {stil!r}, which the base document does not define"
             )
         for text in _absatztexte(b):
-            plan.append((stil, text))
+            plan.append((stil_obj, text))
 
-    _leere_generierte_zone(doc)
+    body = cast(Any, doc).element.body
+    _leere_generierte_zone(body, finde_grenze(body, profil.koerpergrenze))
+    if _hat_inhaltsverzeichnis(body):
+        _felder_beim_oeffnen_aktualisieren(doc)
 
-    for stil, text in plan:
-        doc.add_paragraph(text, style=stil)
+    for stil_obj, text in plan:
+        doc.add_paragraph(text, style=stil_obj)
 
     out = io.BytesIO()
     doc.save(out)
     return out.getvalue()
 
 
-def _leere_generierte_zone(doc: DocxDocument) -> None:
-    """Remove block-level content from the body, keeping the trailing sectPr.
+def _leere_generierte_zone(body: Any, anker: Any | None) -> None:
+    """Clear the generated zone: every top-level block after ``anker`` (or the
+    whole body when ``anker`` is None).
 
-    The body-level ``sectPr`` is the last child of ``<w:body>`` and holds the
-    section geometry; headers and footers live in section parts, not the body,
-    so clearing paragraphs and tables leaves all of that intact. This is the
-    recipe verified against python-docx before it was relied on here.
+    Kept: the trailing body ``sectPr`` (page geometry, header and footer
+    references), paragraphs that end a section (emptied, so the section
+    structure and its headers survive), and range markup such as bookmark ends.
+    New content is appended at the end of the body, i.e. into the last section.
     """
-    body = cast(Any, doc).element.body
-    for child in list(body):
-        if child.tag in (qn("w:p"), qn("w:tbl")):
-            body.remove(child)
+    kinder = list(body)
+    start = 0 if anker is None else kinder.index(anker) + 1
+    for el in kinder[start:]:
+        if el.tag not in BLOCK_TAGS:
+            continue
+        ppr = el.find(qn("w:pPr"))
+        if el.tag == qn("w:p") and ppr is not None and ppr.find(qn("w:sectPr")) is not None:
+            for kind in list(el):
+                if kind is not ppr:
+                    el.remove(kind)
+            continue
+        body.remove(el)
+
+
+def _hat_inhaltsverzeichnis(body: Any) -> bool:
+    return any(" TOC " in f" {t.text or ''} " for t in body.iter(qn("w:instrText")))
+
+
+# Elements that must follow w:updateFields in w:settings (ECMA-376, CT_Settings).
+_NACH_UPDATEFIELDS = {
+    "hdrShapeDefaults",
+    "footnotePr",
+    "endnotePr",
+    "compat",
+    "docVars",
+    "rsids",
+    "mathPr",
+    "attachedSchema",
+    "themeFontLang",
+    "clrSchemeMapping",
+    "doNotIncludeSubdocsInStats",
+    "doNotAutoCompressPictures",
+    "forceUpgrade",
+    "captions",
+    "readModeInkLockDown",
+    "smartTagType",
+    "schemaLibrary",
+    "shapeDefaults",
+    "doNotEmbedSmartTags",
+    "decimalSymbol",
+    "listSeparator",
+}
+
+
+def _felder_beim_oeffnen_aktualisieren(doc: DocxDocument) -> None:
+    """Set ``w:updateFields`` so Word refreshes the kept table of contents (and
+    any other field) when the document is opened."""
+    settings = cast(Any, doc).settings.element
+    vorhanden = settings.find(qn("w:updateFields"))
+    if vorhanden is not None:
+        vorhanden.set(qn("w:val"), "true")
+        return
+    neu = settings.makeelement(qn("w:updateFields"), {qn("w:val"): "true"})
+    for kind in settings:
+        if isinstance(kind.tag, str) and kind.tag.split("}")[-1] in _NACH_UPDATEFIELDS:
+            kind.addprevious(neu)
+            return
+    settings.append(neu)

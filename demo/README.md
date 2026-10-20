@@ -32,6 +32,22 @@ names and which styles are custom. This is the extract half of ingest
 zone model, which is not built yet. Run with no argument to scan
 `tests/example documents` if that (gitignored, confidential) folder is present.
 
+## Cockpit (drop a template in the browser)
+
+```
+python demo/cockpit.py          # or: uv run python demo/cockpit.py
+```
+
+Opens a local page at http://127.0.0.1:8000. Drop a Word template (`.dotx` or
+`.docx`) onto it and the engine extracts its style inventory live — keyed by
+`styleId`, with the display name and which styles are custom, flagging where the
+two differ. Then map the roles to the template's styles (a rough guess is filled
+in for you) and render the sample content into it; the `.docx` downloads.
+
+The server runs on your machine and nothing is uploaded. Rendering regenerates
+the body against the mapped styles and keeps the template's header, footer and
+letterhead; retaining a title page (the zone model) is not built yet.
+
 ## What this demo does not show yet
 
 Tables, the zone model (retaining a title page and table of contents while

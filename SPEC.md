@@ -153,5 +153,5 @@ The renderer sets title, author and company cleanly and leaves no tooling traces
 
 ## References
 
-- `docs/adr/` : ADR-0001 to ADR-0013
+- `docs/adr/` : ADR-0001 to ADR-0014
 - `docs/GLOSSARY.md`

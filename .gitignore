@@ -15,6 +15,7 @@ build/
 *.dotx
 !tests/fixtures/**/*.docx
 !tests/fixtures/**/*.dotx
+/testing_templates/
 
 # Environment
 .env
@@ -28,3 +29,6 @@ Thumbs.db
 
 # Demo outputs
 demo/out/
+
+# Server data: stored client templates and rendered documents
+/data/
